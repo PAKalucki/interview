@@ -1,0 +1,43 @@
+---
+- hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Wait for system to become reachable
+      wait_for_connection:
+
+    - name: Get information about installed packages
+      package_facts:
+        manager: "auto"
+
+    ### This is a bit pointless as python is requirement for ansible to work so if it was really missing we probably wouldn't get this far
+    - name: Fail when Python3 not found
+      fail:
+        msg: Python3 not found
+      when: "'python3' not in ansible_facts.packages"
+
+    ### In production environment I would consider specifing version
+    - name: Install boto3
+      ansible.builtin.pip:
+          name: boto3
+
+    - name: Create folder
+      ansible.builtin.file:
+        path: "/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - downloads
+        - processed
+
+    - name: Copy python script to remote
+      ansible.builtin.copy:
+        src: script.py
+        dest: /script.py
+        owner: ec2-user
+        mode: '0744'
+
+    - name: Create cron job to run every minute
+      ansible.builtin.cron:
+        name: "script"
+        job: "python3 /script.py"
